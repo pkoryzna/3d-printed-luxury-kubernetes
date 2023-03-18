@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-motion
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-motion
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-motion
+    spec:
+      containers:
+        - image: motionproject/motion:latest
+          name: motion
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+              {{ range .Values.camera.deviceNames }}
+              smarter-devices/{{ . }}: '1'
+              {{ end }}
+          volumeMounts:
+            - mountPath: /usr/local/etc/motion
+              name: config
+              readOnly: true
+            - mountPath: /var/lib/motion
+              name: motion-storage
+      volumes:
+        - configMap:
+            items:
+              - key: motion.conf
+                path: motion.conf
+            name: {{ .Release.Name }}-motion
+          name: config
+        - emptyDir: {}
+          name: motion-storage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-motion
+  namespace: {{ .Release.Namespace }}
+data:
+  motion.conf: |
+    log_level 6
+    webcontrol_port 0
+    webcontrol_parms 2
+    webcontrol_localhost off
+
+    stream_port 8081
+    stream_localhost off
+    stream_maxrate 100
+    stream_preview_method 4
+    stream_quality 75
+
+    daemon off
+    setup_mode off
+
+    camera_name webcam
+    camera_id 1
+    video_device /dev/v4l/by-id/{{ (first .Values.camera.deviceNames) }}
+    v4l2_palette 8
+    width 1280
+    height 720
+    framerate 30
+
+    movie_output off
+    pause on
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-motion
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: webcontrol
+      port: 8080
+      targetPort: 8080
+    - name: stream
+      port: 8081
+      targetPort: 8081
+  selector:
+    app: {{ .Release.Name }}-motion
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-motion-strip-prefix
+  namespace: {{ .Release.Namespace }}
+spec:
+  stripPrefix:
+    prefixes:
+    # filtered for unique paths
+    {{ $paths := dict }}{{ range .Values.camera.streamIngressRules }}
+    {{- if (and (not (hasKey $paths .path)) (not (eq "/" .path))) -}}
+    - {{ .path }}{{ $_ := set $paths .path "" }}
+    {{ end }}
+    {{ end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    # jesus christ
+    # https://community.traefik.io/t/how-to-configure-middleware-with-kubernetes-ingress-middleware-xyz-does-not-exist/5016/5
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-motion-strip-prefix@kubernetescrd
+  labels:
+    name: {{ .Release.Name }}-motion
+  name: {{ .Release.Name }}-motion
+spec:
+  rules:
+  {{- range .Values.camera.streamIngressRules }}
+  - host: {{ .host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{ $.Release.Name }}-motion
+            port:
+              name: stream
+        path: {{ .path }}
+        pathType: Prefix
+  {{- end }}

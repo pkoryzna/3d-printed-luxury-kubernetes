@@ -1,0 +1,7 @@
+apiVersion: v2
+name: 3d-printed-luxury-kubernetes
+description: smarter-device-manager + octoprint + motion 
+type: application
+version: 0.1.0
+# idk if this is needed 
+appVersion: "latest"

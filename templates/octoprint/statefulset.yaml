@@ -1,0 +1,45 @@
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-octoprint
+  labels:
+    app: {{ .Release.Name }}-octoprint
+spec:
+  serviceName: {{ .Release.Name }}-octoprint
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-octoprint
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-octoprint
+    spec:
+      containers:
+      - name: octoprint
+        image: octoprint/octoprint:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /octoprint
+          name: octoprint-vol
+        env:
+        - name: ENABLE_MJPG_STREAMER
+          value: "false"
+        resources:
+          limits:
+            {{ range .Values.octoprint.deviceNames }}
+            smarter-devices/{{ . }}: '1'
+            {{ end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: octoprint-vol
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ .Values.octoprint.storageSize }}

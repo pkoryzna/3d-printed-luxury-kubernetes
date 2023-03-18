@@ -1,0 +1,49 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-octoprint-strip-prefix
+spec:
+  stripPrefix:
+    prefixes:
+    {{ $paths := dict }}{{ range .Values.octoprint.ingressRules }}
+    {{- if (and (not (hasKey $paths .path)) (not (eq "/" .path))) -}}
+    - {{ .path }}{{ $_ := set $paths .path "" }}
+    {{ end }}
+    {{ end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-octoprint
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-octoprint-strip-prefix@kubernetescrd
+spec:
+  rules:
+  {{- range .Values.octoprint.ingressRules }}
+  - host: {{ .host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{ $.Release.Name }}-octoprint
+            port:
+              name: web
+        path: {{ .path }}
+        pathType: Prefix
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-octoprint
+  labels:
+    app: {{ .Release.Name }}-octoprint
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-octoprint

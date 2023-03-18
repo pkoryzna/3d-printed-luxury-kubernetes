@@ -1,0 +1,22 @@
+# Default values for 3d-printed-luxury-kubernetes.
+
+camera:
+  deviceNames: 
+  # lower first - e.g. 0 is the camera dev, 1 is the v4l metadata device crap
+  - "v4l_by-id_usb-0000_FFFF_EEEEEEEE-video-index0"
+  - "v4l_by-id_usb-0000_FFFF_EEEEEEEE-video-index1"
+  streamIngressRules:
+  - host: my-local-host-name.fritz.box
+    path: /stream
+  - host: webcam.example.com
+    path: /stream
+
+octoprint:
+  deviceNames: 
+  - ttyUSB0
+  storageSize: 1Gi
+  ingressRules:
+  - host: my-local-host-name.fritz.box
+    path: /octoprint
+  - host: octoprint.example.com
+    path: /
