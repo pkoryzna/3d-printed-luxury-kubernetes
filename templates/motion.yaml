@@ -30,6 +30,9 @@ spec:
               readOnly: true
             - mountPath: /var/lib/motion
               name: motion-storage
+          env:
+            - name: TZ
+              value: {{ .Values.timezone | default "Etc/UTC" | quote }}
       volumes:
         - configMap:
             items:

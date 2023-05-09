@@ -11,6 +11,8 @@ camera:
   - host: webcam.example.com
     path: /stream
 
+timezone: Europe/Berlin
+
 octoprint:
   deviceNames: 
   - ttyUSB0
